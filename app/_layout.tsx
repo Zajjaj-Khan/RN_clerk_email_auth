@@ -1,58 +1,55 @@
-import FontAwesome from '@expo/vector-icons/FontAwesome';
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
-import { useFonts } from 'expo-font';
-import { Stack } from 'expo-router';
-import * as SplashScreen from 'expo-splash-screen';
-import { useEffect } from 'react';
+import FontAwesome from "@expo/vector-icons/FontAwesome";
+import {
+  DarkTheme,
+  DefaultTheme,
+  ThemeProvider,
+} from "@react-navigation/native";
+import { useFonts } from "expo-font";
+import { Slot, Stack, useRouter, useSegments } from "expo-router";
+import * as SplashScreen from "expo-splash-screen";
+import { useEffect } from "react";
+import {ClerkProvider, useAuth} from '@clerk/clerk-expo';
+import * as SecureStore from 'expo-secure-store';
 
-import { useColorScheme } from '@/components/useColorScheme';
+const CLERK_PUBLISHABLE_KEY = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY;
 
-export {
-  // Catch any errors thrown by the Layout component.
-  ErrorBoundary,
-} from 'expo-router';
-
-export const unstable_settings = {
-  // Ensure that reloading on `/modal` keeps a back button present.
-  initialRouteName: '(tabs)',
+const tokenCache = {
+  getToken(key:string) {
+    return SecureStore.getItemAsync(key);
+  },
+  saveToken(key:string, value:string) {
+    return SecureStore.setItemAsync(key, value);
+  },
 };
 
-// Prevent the splash screen from auto-hiding before asset loading is complete.
-SplashScreen.preventAutoHideAsync();
 
-export default function RootLayout() {
-  const [loaded, error] = useFonts({
-    SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
-    ...FontAwesome.font,
-  });
+const InitialLayout =  () =>{
+  const {isSignedIn, isLoaded} = useAuth();
+  const segments = useSegments();
+  const router = useRouter();
+  useEffect(()=>{
+    if(!isLoaded) return;
+    const inTabsGroup = segments[0] === '(auth)';
+    if(isSignedIn && !inTabsGroup){
+      router.replace('/home');
 
-  // Expo Router uses Error Boundaries to catch errors in the navigation tree.
-  useEffect(() => {
-    if (error) throw error;
-  }, [error]);
-
-  useEffect(() => {
-    if (loaded) {
-      SplashScreen.hideAsync();
+    }else if(!isSignedIn){
+      router.replace('/login')
     }
-  }, [loaded]);
-
-  if (!loaded) {
-    return null;
-  }
-
-  return <RootLayoutNav />;
+    console.log('signedIn', isSignedIn);
+  },[isSignedIn])
+  return <Slot/>
 }
 
-function RootLayoutNav() {
-  const colorScheme = useColorScheme();
 
+
+
+
+const RootLayoutNav = () => {
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
-      </Stack>
-    </ThemeProvider>
+   <ClerkProvider publishableKey={CLERK_PUBLISHABLE_KEY!} tokenCache={tokenCache}>
+    <InitialLayout/>
+   </ClerkProvider>
   );
-}
+};
+export default RootLayoutNav;
